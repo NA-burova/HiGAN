@@ -12,7 +12,7 @@ training:
   lr_policy: 'linear'
   start_decay_epoch: 25
   n_epochs_decay: 45
-  batch_size: 16
+  batch_size: 32
   eval_batch_size: 6
   sample_nrow: 3
   # optimization:
@@ -26,18 +26,19 @@ training:
   start_save_epoch_val: 30
   save_epoch_val: 1
   sample_dir: 'imgs'
-  ckpt_dir: 'ckpts'
+  ckpt_dir: '/content/drive/MyDrive/ckpts'
   lexicon: './data/english_words.txt'
-  max_word_len: 20
-  n_class: 72
+  max_word_len: 40
+  n_class: 153
   capitalize_ratio: 0.5
   sort_input: false
   num_critic_train: 4
+  pretrained_ckpt: './ckpt/last1.pth'
 
 
 valid:
   n_generate: ~
-  dset_name: 'iam_word_org'
+  dset_name: 'iam_word'
   dset_split: 'test'
   batch_size: 16
   dims: 2048
@@ -51,7 +52,14 @@ valid:
 
 test:
   interp_num: 7
-  nrow: 4
+  nrow: 2
+  source: '/content/drive/MyDrive/HWT/notebooks/trainv2.csv'
+  save_to: './notebooks_repro/train/'
+  save_to2: './notebooks_repro/'
+  save_to3: '/content/drive/MyDrive/HWT/'
+  index_to: './notebooks_repro/train.csv'
+  k: 151001
+  k_max: 200000
 
 
 # network configuration
@@ -64,7 +72,7 @@ GenModel:
   resolution: 32
   G_kernel_size: 3
   G_attn: '64'
-  n_class: 72
+  n_class: 153
   num_G_SVs: 1
   num_G_SV_itrs: 1
   G_shared: false
@@ -90,7 +98,7 @@ DiscModel:
   resolution: 32
   D_kernel_size: 3
   D_attn: '64'
-  n_class: 72
+  n_class: 153
   num_D_SVs: 1
   num_D_SV_itrs: 1
   SN_eps: 1.e-08
@@ -110,7 +118,7 @@ OcrModel:
   init: 'none'
   dropout: 0.
   # ctc config
-  n_class: 72
+  n_class: 153
   rnn_depth: 0
   bidirectional: False
 
@@ -127,7 +135,7 @@ EncModel:
 
 
 WidModel:
-  n_writer: 372
+  n_writer: 45
   resolution: 16
   max_dim: 256
   in_channel: 1
