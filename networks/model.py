@@ -94,12 +94,17 @@ class BaseModel(object):
         else:
             ckpt = torch.load(ckpt, map_location=map_location)
 
+
+
+
         if len(modules) == 0:
             for model in self.models.values():
                 model.load_state_dict(ckpt[type(model).__name__])
         else:
             for model in modules:
                 model.load_state_dict(ckpt[type(model).__name__])
+        ckpt['Epoch'] = 0 if 'Epoch' not in ckpt else ckpt['Epoch']
+        return ckpt['Epoch']
 
     def set_mode(self, mode='eval'):
         for model in self.models.values():
@@ -203,12 +208,16 @@ class AdversarialModel(BaseModel):
                                                     'fake_wid_loss', 'real_wid_loss',
                                                     'kl_loss', 'gp_ctc', 'gp_info', 'gp_wid'])
         device = self.device
-
+        epoch_done = 1
+        if os.path.exists(self.opt.training.pretrained_ckpt):
+            epoch_done = self.load(self.opt.training.pretrained_ckpt, self.device)+1
+            self.validate(guided=True)
         ctc_len_scale = 8
-        best_kid = np.inf
-        iter_count = 0
-        for epoch in range(1, self.opt.training.epochs):
+        best_kid = self.opt.training.best_kid
+        iter_count = -1
+        for epoch in range(epoch_done, self.opt.training.epochs):
             for i, (imgs, img_lens, lbs, lb_lens, wids) in enumerate(self.train_loader):
+                iter_count += 1
                 #############################
                 # Prepare inputs & Network Forward
                 #############################
@@ -383,8 +392,12 @@ class AdversarialModel(BaseModel):
                     if not os.path.exists(sample_root):
                         os.makedirs(sample_root)
                     self.sample_images(iter_count + 1)
+                    ckpt_root = os.path.join(self.log_root, self.opt.training.ckpt_dir)
+                    if not os.path.exists(ckpt_root):
+                        os.makedirs(ckpt_root)
 
-                iter_count += 1
+                    self.save('inepoch'+str(iter_count), epoch)
+
 
             if epoch:
                 ckpt_root = os.path.join(self.log_root, self.opt.training.ckpt_dir)
@@ -402,6 +415,7 @@ class AdversarialModel(BaseModel):
                     if kid < best_kid:
                         best_kid = kid
                         self.save('best', epoch, KID=kid, FID=fid)
+                        print('saving with best KID = ', kid)
                     if self.writer:
                         self.writer.add_scalar('valid/FID', fid, epoch)
                         self.writer.add_scalar('valid/KID', kid, epoch)
@@ -601,6 +615,7 @@ class AdversarialModel(BaseModel):
                 plt.tight_layout()
                 plt.show()
 
+
     def eval_rand(self):
         self.set_mode('eval')
 
@@ -637,6 +652,78 @@ class AdversarialModel(BaseModel):
                 plt.tight_layout()
                 plt.show()
 
+    
+    def eval_repro(self):
+        self.set_mode('eval')
+
+        with torch.no_grad():
+            nrow, ncol = self.opt.test.nrow, 2
+            rand_z = prepare_z_dist(nrow, self.opt.GenModel.style_dim, self.device)
+            import pandas as pd
+            import os
+            import shutil
+            if self.opt.test.source[-3:]=='tsv':
+                source=pd.read_table(self.opt.test.source, header=None)
+                i0=0
+                i1=1
+            else:
+                source=pd.read_csv(self.opt.test.source)
+                i0='file'
+                i1='text'
+            
+            if not os.path.exists(self.opt.test.save_to):
+                os.makedirs(self.opt.test.save_to)
+            k=0
+            alpha=get_true_alphabet(self.opt.dataset)
+            for idx, line in source.iterrows():
+                k+=1
+                if k<self.opt.test.k:
+                  continue
+                text = str(line[i1])
+                name=line[i0]
+                if len(text) == 0:
+                    continue
+                if any([i not in alpha for i in text]):
+                  print('Character not in alphabet for '+text, '-- skipping')
+                  continue
+                texts = text.split(' ')
+                ncol = len(texts)
+                if len(texts) == 1:
+                    fake_lbs = self.label_converter.encode(texts)
+                    fake_lbs = torch.LongTensor(fake_lbs)
+                    fake_lb_lens = torch.IntTensor([len(texts[0])])
+                else:
+                    fake_lbs, fake_lb_lens = self.label_converter.encode(texts)
+
+                fake_lbs = fake_lbs.repeat(nrow, 1).to(self.device)
+                fake_lb_lens = fake_lb_lens.repeat(nrow, ).to(self.device)
+
+                rand_z.sample_()
+                rand_styles = rand_z.unsqueeze(1).repeat(1, ncol, 1).view(nrow * ncol, self.opt.GenModel.style_dim)
+                gen_imgs = self.models.G(rand_styles, fake_lbs, fake_lb_lens)
+                gen_imgs = (1 - gen_imgs).squeeze().cpu().numpy() * 127
+                for i in range(nrow):
+                    plt.figure()
+                    for j in range(ncol):
+                        plt.subplot(1, ncol, 1 + j)
+                        plt.imshow(gen_imgs[i * ncol + j], cmap='gray')
+                        plt.axis('off')
+                    plt.tight_layout()
+                    # plt.show()
+                    plt.savefig(self.opt.test.save_to+name+'_'+str(i)+'.png')
+                    plt.close()
+                    w=pd.DataFrame([[name+'_'+str(i)+'.png', text]], columns=['file', 'text'])
+                    w.to_csv(self.opt.test.index_to, mode='a', header=not os.path.exists(self.opt.test.index_to))
+                if not k % 1000:
+                    shutil.make_archive('save', 'zip', self.opt.test.save_to2)
+                    shutil.copy('save.zip', self.opt.test.save_to3)
+                if not k % 100:
+                    print(k, line[i0], line[i1])
+                if k==self.opt.test.k_max:
+                  break
+            shutil.make_archive('save', 'zip', self.opt.test.save_to2)
+            shutil.copy('save.zip', self.opt.test.save_to3)
+                
     def eval_text(self):
         self.set_mode('eval')
 
