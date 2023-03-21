@@ -1,4 +1,9 @@
 # HiGAN
+## What's new here:
+- Training on ru - [cyrillic handwriting dataset](https://www.kaggle.com/datasets/constantinwerner/cyrillic-handwriting-dataset) -- preprocessed: [train](https://disk.yandex.ru/d/lZLy4qsTZPH4jA) [test](https://disk.yandex.ru/d/O8cENapJBud7pQ) -- [checkpoint of model](https://disk.yandex.ru/d/78rJrpg83-G37g)
+- Generating dstasets on words from [cyrillic handwriting dataset](https://www.kaggle.com/datasets/constantinwerner/cyrillic-handwriting-dataset) - 4x size - [result](https://disk.yandex.ru/d/uDXq5rB0m-Lm8Q) and from [htr_datasets/school_notebooks/](https://github.com/ai-forever/htr_datasets/tree/main/school_notebooks) - 2x size - have missing words because of facing characters not in alphabet (e.g. |) - [result](https://disk.yandex.ru/d/twJJem23QVlm9A)
+
+### All stuff below is from original repo
 
 ## NEWs
 An improved work HiGAN+ is available at [https://github.com/ganji15/HiGANplus](https://github.com/ganji15/HiGANplus).
